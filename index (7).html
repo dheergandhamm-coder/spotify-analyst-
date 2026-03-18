@@ -201,6 +201,8 @@ body::before {
 .btn-save-pl { margin-top:20px; background:none; border:1px solid var(--accent2); color:var(--accent2); padding:10px 24px; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .2s; }
 .btn-save-pl:hover { background:var(--accent2); color:#000; }
 .btn-save-pl.saved { background:var(--accent2); color:#000; pointer-events:none; }
+.btn-open-spotify { display:inline-block; margin-top:12px; margin-left:10px; border:1px solid var(--accent); color:var(--accent); padding:10px 24px; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; text-decoration:none; transition:all .2s; }
+.btn-open-spotify:hover { background:var(--accent); color:#000; }
 
 /* CHAT */
 .chat-wrap { display:flex; flex-direction:column; height:calc(100vh - 200px); min-height:480px; }
@@ -799,7 +801,8 @@ function renderPlaylist(pl){
     <div class="pl-name">${pl.name}</div>
     <div class="pl-desc-text">${pl.description}</div>
     ${(pl.tracks||[]).map((t,i)=>`<div class="pl-track"><span class="pl-n">0${i+1}</span><div class="pl-info"><div class="pl-tname">${t.name}</div><div class="pl-tartist">${t.artist}</div></div><span class="pl-twhy">${t.reason}</span></div>`).join('')}
-    <button class="btn-save-pl" id="${id}" onclick="saveToSpotify(${JSON.stringify(pl).replace(/"/g,'&quot;')}, '${id}')">Save to Spotify</button>`;
+    <button class="btn-save-pl" id="${id}" onclick="saveToSpotify(${JSON.stringify(pl).replace(/"/g,'&quot;')}, '${id}')">Save to Spotify</button>
+    <span id="${id}-open-wrap"></span>`;
 }
 
 async function saveToSpotify(pl,btnId){
@@ -880,6 +883,10 @@ async function saveToSpotify(pl,btnId){
     }
     b.textContent='✓ Saved to Spotify';
     b.classList.add('saved');
+    const openWrap = document.getElementById(`${btnId}-open-wrap`);
+    if(openWrap){
+      openWrap.innerHTML = `<a class="btn-open-spotify" href="${playlistUrl}" target="_blank" rel="noopener">Open in Spotify</a>`;
+    }
     console.log('[Spotify] Playlist save finished.', { playlistUrl });
   } catch(e){
     console.error('[Spotify] Save failed.', {
