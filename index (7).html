@@ -553,7 +553,21 @@ async function sp(ep,body){
   const r=await fetch('https://api.spotify.com/v1'+ep,{method:'POST',headers:{Authorization:'Bearer '+S.token,'Content-Type':'application/json'
       },body:JSON.stringify(body)});
   if(r.status===401){onAuthExpired();throw new Error('Unauthorized');}
-  return r.json();
+  const raw = await r.text();
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch(e) {
+    data = raw;
+  }
+  if(!r.ok){
+    const err = new Error(`Spotify POST failed (${r.status}) for ${ep}`);
+    err.status = r.status;
+    err.endpoint = ep;
+    err.response = data;
+    throw err;
+  }
+  return data;
 }
 
 async function fetchAll(){
@@ -819,12 +833,16 @@ async function saveToSpotify(pl,btnId){
       trackCount: (pl.tracks || []).length
     });
     console.log('[Spotify] Creating playlist...');
-    const c=await sp(`/users/${S.profile.id}/playlists`,{
+    const c=await sp('/me/playlists',{
       name:playlistName,
       description:pl.description+' — via Jarvis',
       public:true
     });
     console.log('[Spotify] Playlist created.', c);
+    if(!c?.id){
+      console.error('[Spotify] Playlist creation returned no playlist ID.', c);
+      throw new Error('Playlist created response missing id');
+    }
     const playlistUrl = c?.external_urls?.spotify || `https://open.spotify.com/playlist/${c.id}`;
     console.log('[Spotify] Redirecting to playlist.', { playlistUrl });
     if(spotifyTab){
@@ -864,7 +882,13 @@ async function saveToSpotify(pl,btnId){
     b.classList.add('saved');
     console.log('[Spotify] Playlist save finished.', { playlistUrl });
   } catch(e){
-    console.error('[Spotify] Save failed.', e);
+    console.error('[Spotify] Save failed.', {
+      message: e?.message,
+      status: e?.status,
+      endpoint: e?.endpoint,
+      response: e?.response,
+      error: e
+    });
     b.textContent='error — try again';
     b.disabled=false;
   }
