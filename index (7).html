@@ -797,22 +797,30 @@ async function saveToSpotify(pl,btnId){
     return;
   }
   const b=document.getElementById(btnId);
+  const chosenName = window.prompt('Choose a title for your Spotify playlist:', pl.name || 'Jarvis Playlist');
+  if(chosenName === null){
+    console.log('[Spotify] Playlist save cancelled by user before creation.');
+    return;
+  }
+  const playlistName = chosenName.trim() || pl.name || 'Jarvis Playlist';
   b.textContent='saving...';
   b.disabled=true;
   try {
     console.log('[Spotify] Starting playlist save.', {
       userId: S.profile?.id,
-      name: pl.name,
+      name: playlistName,
       trackCount: (pl.tracks || []).length
     });
     console.log('[Spotify] Creating playlist...');
     const c=await sp(`/users/${S.profile.id}/playlists`,{
-      name:pl.name,
+      name:playlistName,
       description:pl.description+' — via Jarvis',
       public:true
     });
     console.log('[Spotify] Playlist created.', c);
     const playlistUrl = c?.external_urls?.spotify || `https://open.spotify.com/playlist/${c.id}`;
+    console.log('[Spotify] Opening playlist right away so you can watch it build.', { playlistUrl });
+    window.open(playlistUrl, '_blank', 'noopener');
     const uris=[];
     for(const t of(pl.tracks||[]).slice(0,10)){
       console.log('[Spotify] Searching track...', { name: t.name, artist: t.artist });
@@ -842,8 +850,7 @@ async function saveToSpotify(pl,btnId){
     }
     b.textContent='✓ Saved to Spotify';
     b.classList.add('saved');
-    console.log('[Spotify] Opening playlist URL...', { playlistUrl });
-    window.open(playlistUrl, '_blank', 'noopener');
+    console.log('[Spotify] Playlist save finished.', { playlistUrl });
   } catch(e){
     console.error('[Spotify] Save failed.', e);
     b.textContent='error — try again';
