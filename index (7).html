@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jarvis</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:ital,wght@0,300;0,600;0,700;1,300;1,600&display=swap');
+
+:root {
+  --bg: #080706;
+  --surface: #0e0c0b;
+  --border: #1e1a17;
+  --accent: #c9a96e;
+  --accent2: #1DB954;
+  --text: #e8e0d5;
+  --sub: #6b6057;
+  --dim: #2a2520;
+  --warm: #f5ede0;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes spin { to { transform:rotate(360deg); } }
+@keyframes pulse { 0%,100% { opacity:.2; } 50% { opacity:.8; } }
+@keyframes wave { 0%,100% { height:3px; } 50% { height:var(--h,14px); } }
+@keyframes breathe { 0%,100% { opacity:.4; transform:scale(1); } 50% { opacity:.8; transform:scale(1.02); } }
+
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity:.5;
+}
+
+body::before {
+  content:''; position:fixed; top:-30%; left:50%; transform:translateX(-50%);
+  width:600px; height:400px; border-radius:50%; pointer-events:none; z-index:0;
+  background:radial-gradient(ellipse, rgba(201,169,110,0.04) 0%, transparent 70%);
+}
+
+.page { display:none; min-height:100vh; position:relative; z-index:1; }
+.page.active { display:flex; flex-direction:column; animation:fadeIn .6s ease; }
+
+/* LANDING */
+#landing { align-items:center; justify-content:center; text-align:center; padding:48px 24px; }
+
+.waveform { display:flex; gap:3px; align-items:flex-end; height:32px; margin-bottom:56px; justify-content:center; opacity:.5; }
+.waveform span { width:2px; background:var(--accent); border-radius:2px; animation:wave 1.4s ease-in-out infinite; }
+
+.l-kicker { font-size:10px; letter-spacing:5px; color:var(--sub); margin-bottom:24px; }
+.l-title { font-family:'Cormorant Garamond',serif; font-size:clamp(52px,11vw,100px); line-height:.9; letter-spacing:-3px; font-weight:300; margin-bottom:20px; color:var(--warm); }
+.l-title strong { font-weight:700; }
+.l-title em { color:var(--accent); font-style:italic; }
+.l-line { width:40px; height:1px; background:var(--accent); margin:0 auto 24px; opacity:.4; }
+.l-sub { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:17px; color:var(--sub); max-width:360px; line-height:1.7; margin:0 auto 52px; }
+
+.btn-connect {
+  display:inline-flex; align-items:center; gap:10px;
+  background:transparent; color:var(--accent);
+  border:1px solid rgba(201,169,110,0.4); padding:14px 36px;
+  font-family:'DM Mono',monospace; font-size:10px;
+  letter-spacing:3px; text-transform:uppercase;
+  cursor:pointer; transition:all .3s; text-decoration:none;
+}
+.btn-connect:hover { background:var(--accent); color:#000; border-color:var(--accent); }
+.btn-connect svg { width:16px; height:16px; flex-shrink:0; }
+
+.demo-link { margin-top:20px; font-size:10px; color:var(--dim); letter-spacing:1px; }
+.demo-link a { color:var(--sub); cursor:pointer; text-decoration:none; transition:color .2s; }
+.demo-link a:hover { color:var(--accent); }
+.status {
+  margin-top:18px;
+  font-size:10px;
+  letter-spacing:1px;
+  color:var(--sub);
+  font-family:'DM Mono',monospace;
+  opacity:.8;
+}
+.status.warn { color:#b68b6a; }
+.status.err { color:#d18a7a; }
+
+/* LOADING */
+#loading { align-items:center; justify-content:center; gap:28px; text-align:center; }
+.spinner { width:32px; height:32px; border:1px solid rgba(201,169,110,0.3); border-top-color:var(--accent); border-radius:50%; animation:spin .9s linear infinite; }
+.load-msg { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:16px; color:var(--sub); animation:breathe 2s ease-in-out infinite; }
+
+/* APP */
+#app { flex-direction:column; }
+
+.header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 32px; border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:100;
+  background:rgba(8,7,6,.94); backdrop-filter:blur(20px);
+}
+.logo { font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:700; letter-spacing:-0.5px; color:var(--warm); }
+.logo em { color:var(--accent); font-style:italic; }
+
+.nav { display:flex; gap:1px; }
+.nb { background:none; border:none; color:var(--sub); font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; padding:8px 12px; transition:color .2s; }
+.nb:hover { color:var(--text); }
+.nb.on { color:var(--accent); }
+
+.user-info { display:flex; align-items:center; gap:8px; }
+.user-name { font-size:10px; color:var(--sub); letter-spacing:1px; }
+.live { width:5px; height:5px; border-radius:50%; background:var(--accent2); animation:pulse 3s infinite; }
+.user-img { width:24px; height:24px; border-radius:50%; border:1px solid var(--dim); display:none; }
+
+.content { flex:1; padding:40px 32px; max-width:760px; margin:0 auto; width:100%; }
+.panel { display:none; }
+.panel.on { display:block; animation:fadeUp .4s ease; }
+
+/* TODAY */
+.today-greeting { font-family:'Cormorant Garamond',serif; font-size:clamp(22px,4vw,32px); font-weight:300; color:var(--warm); line-height:1.3; margin-bottom:32px; letter-spacing:-.5px; }
+.today-greeting em { font-style:italic; color:var(--accent); }
+
+.today-notice { background:var(--surface); border:1px solid var(--border); border-left:2px solid var(--accent); padding:20px 24px; margin-bottom:16px; font-family:'Cormorant Garamond',serif; font-style:italic; font-size:15px; color:#998a78; line-height:1.7; }
+
+.rt-label { font-size:9px; letter-spacing:4px; color:var(--sub); text-transform:uppercase; margin-bottom:16px; margin-top:32px; display:block; }
+.rt-track { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+.rt-img { width:36px; height:36px; border-radius:2px; object-fit:cover; background:var(--dim); flex-shrink:0; }
+.rt-info { flex:1; min-width:0; }
+.rt-name { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); }
+.rt-artist { font-size:10px; color:var(--sub); margin-top:2px; }
+.rt-time { font-size:9px; color:var(--dim); white-space:nowrap; }
+
+/* MIRROR */
+.first-read { margin-bottom:40px; padding-bottom:40px; border-bottom:1px solid var(--border); }
+.fr-label { font-size:9px; letter-spacing:4px; color:var(--sub); text-transform:uppercase; margin-bottom:20px; }
+.fr-text { font-family:'Cormorant Garamond',serif; font-size:clamp(18px,3vw,24px); font-weight:300; color:var(--warm); line-height:1.6; letter-spacing:-.3px; font-style:italic; }
+
+.ms-label { font-size:9px; letter-spacing:4px; color:var(--sub); text-transform:uppercase; margin-bottom:16px; display:flex; align-items:center; gap:12px; margin-top:36px; }
+.ms-label::after { content:''; flex:1; height:1px; background:var(--border); }
+.ms-text { font-family:'Cormorant Garamond',serif; font-size:15px; color:#998a78; line-height:1.8; font-style:italic; }
+
+.alter-ego { background:var(--surface); border:1px solid var(--border); padding:28px 32px; }
+.ae-name { font-family:'Cormorant Garamond',serif; font-size:clamp(28px,5vw,44px); font-weight:700; letter-spacing:-1.5px; color:var(--accent); line-height:1; margin-bottom:8px; }
+.ae-sub { font-size:10px; color:var(--sub); letter-spacing:2px; margin-bottom:20px; }
+.ae-desc { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:15px; color:#998a78; line-height:1.8; }
+
+.letter { background:var(--surface); border:1px solid var(--border); padding:32px 36px; position:relative; }
+.letter::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--accent),transparent); }
+.letter-from { font-size:9px; letter-spacing:3px; color:var(--sub); margin-bottom:20px; text-transform:uppercase; }
+.letter-body { font-family:'Cormorant Garamond',serif; font-size:16px; color:var(--warm); line-height:1.9; font-weight:300; }
+.letter-body p { margin-bottom:16px; }
+.letter-body p:last-child { margin-bottom:0; }
+.letter-sign { margin-top:24px; font-size:11px; color:var(--sub); font-style:italic; font-family:'Cormorant Garamond',serif; }
+
+.share-letter { margin-top:16px; background:none; border:1px solid var(--border); color:var(--sub); padding:10px 20px; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .2s; }
+.share-letter:hover { border-color:var(--accent); color:var(--accent); }
+
+/* DISCOVER */
+.prophecy-intro { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:15px; color:var(--sub); line-height:1.7; margin-bottom:32px; }
+.prophecy-track { padding:24px 0; border-bottom:1px solid var(--border); }
+.pt-num { font-size:9px; color:var(--dim); margin-bottom:12px; letter-spacing:2px; }
+.pt-name { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; letter-spacing:-.5px; color:var(--warm); margin-bottom:4px; }
+.pt-artist { font-size:11px; color:var(--sub); margin-bottom:12px; }
+.pt-why { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:13px; color:var(--sub); line-height:1.6; }
+
+.blind-spot { margin-top:40px; background:var(--surface); border:1px solid var(--border); padding:24px 28px; border-left:2px solid rgba(201,169,110,0.3); }
+.bs-label { font-size:9px; letter-spacing:4px; color:var(--sub); text-transform:uppercase; margin-bottom:14px; }
+.bs-text { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:15px; color:#998a78; line-height:1.8; }
+
+/* PLAYLIST */
+.mp-label { font-size:9px; letter-spacing:4px; color:var(--sub); text-transform:uppercase; margin-bottom:16px; }
+.mp-question { font-family:'Cormorant Garamond',serif; font-size:20px; font-style:italic; color:var(--warm); margin-bottom:20px; }
+.mp-input { width:100%; background:none; border:none; border-bottom:1px solid var(--border); padding:12px 0; font-family:'Cormorant Garamond',serif; font-size:18px; font-style:italic; color:var(--text); outline:none; caret-color:var(--accent); transition:border .2s; }
+.mp-input:focus { border-bottom-color:var(--accent); }
+.mp-input::placeholder { color:var(--dim); }
+.mp-chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; margin-bottom:20px; }
+.mp-chip { font-size:10px; color:var(--sub); border:1px solid var(--border); padding:6px 12px; cursor:pointer; transition:all .2s; font-family:'Cormorant Garamond',serif; font-style:italic; }
+.mp-chip:hover { color:var(--text); border-color:var(--sub); }
+
+.btn-gen { background:transparent; border:1px solid rgba(201,169,110,0.4); color:var(--accent); padding:11px 28px; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:3px; text-transform:uppercase; cursor:pointer; transition:all .2s; }
+.btn-gen:hover { background:var(--accent); color:#000; border-color:var(--accent); }
+.btn-gen:disabled { opacity:.3; cursor:not-allowed; }
+
+.pl-out { margin-top:32px; }
+.pl-name { font-family:'Cormorant Garamond',serif; font-size:28px; font-weight:700; letter-spacing:-1px; color:var(--warm); margin-bottom:6px; }
+.pl-desc-text { font-size:12px; color:var(--sub); font-style:italic; font-family:'Cormorant Garamond',serif; margin-bottom:24px; }
+.pl-track { display:flex; align-items:center; gap:14px; padding:12px 0; border-bottom:1px solid var(--border); }
+.pl-n { font-size:9px; color:var(--dim); min-width:20px; }
+.pl-info { flex:1; }
+.pl-tname { font-size:13px; color:var(--text); }
+.pl-tartist { font-size:10px; color:var(--sub); margin-top:2px; }
+.pl-twhy { font-size:10px; color:var(--dim); text-align:right; font-style:italic; font-family:'Cormorant Garamond',serif; max-width:130px; }
+.btn-save-pl { margin-top:20px; background:none; border:1px solid var(--accent2); color:var(--accent2); padding:10px 24px; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .2s; }
+.btn-save-pl:hover { background:var(--accent2); color:#000; }
+.btn-save-pl.saved { background:var(--accent2); color:#000; pointer-events:none; }
+
+/* CHAT */
+.chat-wrap { display:flex; flex-direction:column; height:calc(100vh - 200px); min-height:480px; }
+.chat-intro { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:14px; color:var(--sub); margin-bottom:20px; line-height:1.6; }
+.chat-msgs { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:20px; padding-bottom:16px; }
+
+.msg { display:flex; gap:12px; animation:fadeUp .3s ease; }
+.msg.user { flex-direction:row-reverse; }
+.av { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; background:var(--surface); color:var(--sub); }
+.msg.jarvis .av { border-color:rgba(201,169,110,0.3); color:var(--accent); }
+.bbl { max-width:80%; padding:14px 18px; background:var(--surface); border:1px solid var(--border); font-family:'Cormorant Garamond',serif; font-size:15px; line-height:1.7; color:#998a78; }
+.msg.user .bbl { background:rgba(201,169,110,0.05); border-color:rgba(201,169,110,0.12); color:var(--text); font-size:14px; font-family:'DM Mono',monospace; }
+
+.starters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+.starter { font-size:11px; color:var(--sub); border:1px solid var(--border); padding:8px 14px; cursor:pointer; transition:all .2s; font-family:'Cormorant Garamond',serif; font-style:italic; }
+.starter:hover { color:var(--text); border-color:var(--sub); }
+
+.chat-foot { display:flex; gap:10px; align-items:flex-end; padding-top:16px; border-top:1px solid var(--border); }
+.chat-in { flex:1; background:none; border:none; border-bottom:1px solid var(--border); padding:12px 0; font-family:'DM Mono',monospace; font-size:12px; color:var(--text); outline:none; resize:none; transition:border .2s; caret-color:var(--accent); }
+.chat-in:focus { border-bottom-color:var(--accent); }
+.btn-send { background:transparent; border:1px solid rgba(201,169,110,0.3); color:var(--accent); width:40px; height:40px; cursor:pointer; font-size:14px; transition:all .2s; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.btn-send:hover { background:var(--accent); color:#000; border-color:var(--accent); }
+.btn-send:disabled { opacity:.3; cursor:not-allowed; }
+
+.thinking { display:flex; gap:5px; align-items:center; padding:2px 0; }
+.thinking span { width:4px; height:4px; border-radius:50%; background:var(--accent); animation:pulse 1.4s infinite; }
+.thinking span:nth-child(2) { animation-delay:.2s; }
+.thinking span:nth-child(3) { animation-delay:.4s; }
+
+@media(max-width:600px) {
+  .header { padding:14px 16px; }
+  .nb { padding:7px 8px; font-size:8px; }
+  .content { padding:28px 16px; }
+  .letter { padding:24px 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- LANDING -->
+<div class="page active" id="landing">
+  <div class="waveform" id="wf"></div>
+  <p class="l-kicker">— your other self —</p>
+  <h1 class="l-title">
+    <strong>Your music</strong><br>
+    already knows<br>
+    <em>who you are.</em>
+  </h1>
+  <div class="l-line"></div>
+  <p class="l-sub">Connect Spotify. Meet the version of yourself your music has been quietly building.</p>
+  <a id="loginBtn" class="btn-connect" href="#">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+    Connect with Spotify
+  </a>
+  <p class="demo-link">No Spotify? <a onclick="runDemo()">listen without connecting →</a></p>
+  <div class="status" id="status"></div>
+</div>
+
+<!-- LOADING -->
+<div class="page" id="loading">
+  <div class="spinner"></div>
+  <p class="load-msg" id="loadMsg">listening...</p>
+</div>
+
+<!-- APP -->
+<div class="page" id="app">
+  <header class="header">
+    <div class="logo">J<em>arvis</em></div>
+    <nav class="nav">
+      <button class="nb on" onclick="sw('Today',this)">Today</button>
+      <button class="nb" onclick="sw('Mirror',this)">Mirror</button>
+      <button class="nb" onclick="sw('Discover',this)">Discover</button>
+      <button class="nb" onclick="sw('Playlist',this)">Playlist</button>
+      <button class="nb" onclick="sw('Chat',this)">Jarvis</button>
+    </nav>
+    <div class="user-info">
+      <div class="live"></div>
+      <span class="user-name" id="uName">—</span>
+      <img class="user-img" id="uImg" src="" alt="">
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- TODAY -->
+    <div class="panel on" id="panelToday">
+      <div class="today-greeting" id="todayGreeting">Good to see you.</div>
+      <div id="todayNotices"></div>
+      <span class="rt-label">Recently played</span>
+      <div id="recentList"></div>
+    </div>
+
+    <!-- MIRROR -->
+    <div class="panel" id="panelMirror">
+      <div class="first-read">
+        <p class="fr-label">What Jarvis sees</p>
+        <div class="fr-text" id="frText">...</div>
+      </div>
+      <p class="ms-label">The deep read</p>
+      <div class="ms-text" id="deepRead">...</div>
+      <p class="ms-label">Your alter ego</p>
+      <div class="alter-ego">
+        <div class="ae-name" id="aeName">—</div>
+        <div class="ae-sub" id="aeSub">—</div>
+        <div class="ae-desc" id="aeDesc">—</div>
+      </div>
+      <p class="ms-label">An unsent letter</p>
+      <div class="letter">
+        <p class="letter-from">From: the version of you your music reveals</p>
+        <div class="letter-body" id="letterBody">...</div>
+        <p class="letter-sign" id="letterSign">— Jarvis</p>
+      </div>
+      <button class="share-letter" onclick="copyLetter()">Copy letter</button>
+    </div>
+
+    <!-- DISCOVER -->
+    <div class="panel" id="panelDiscover">
+      <p class="prophecy-intro" id="prophecyIntro">...</p>
+      <div id="prophecyTracks"></div>
+      <div class="blind-spot" id="blindSpot" style="display:none">
+        <p class="bs-label">Your blind spot</p>
+        <p class="bs-text" id="bsText">...</p>
+      </div>
+    </div>
+
+    <!-- PLAYLIST -->
+    <div class="panel" id="panelPlaylist">
+      <p class="mp-label">Build a playlist</p>
+      <p class="mp-question">What are you going through right now?</p>
+      <textarea class="mp-input" id="moodIn" rows="2" placeholder="tell Jarvis what you're feeling..."></textarea>
+      <div class="mp-chips">
+        <span class="mp-chip" onclick="setMood(this)">I can't sleep and I'm thinking too much</span>
+        <span class="mp-chip" onclick="setMood(this)">I feel like the main character today</span>
+        <span class="mp-chip" onclick="setMood(this)">something shifted and I don't know what</span>
+        <span class="mp-chip" onclick="setMood(this)">I need to feel something real</span>
+      </div>
+      <button class="btn-gen" id="btnGen" onclick="genPlaylist()">Build it →</button>
+      <div class="pl-out" id="plOut"></div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="panel" id="panelChat">
+      <p class="chat-intro">Jarvis already knows you. Ask anything — about your taste, about yourself, about what you should listen to right now.</p>
+      <div class="starters" id="starters">
+        <span class="starter" onclick="qs(this)">Why do I keep returning to the same songs?</span>
+        <span class="starter" onclick="qs(this)">What does my taste say about how I handle emotions?</span>
+        <span class="starter" onclick="qs(this)">What am I really looking for in music?</span>
+        <span class="starter" onclick="qs(this)">Find me a song I've never heard that will hit hard</span>
+      </div>
+      <div class="chat-wrap">
+        <div class="chat-msgs" id="chatMsgs"></div>
+        <div class="chat-foot">
+          <textarea class="chat-in" id="chatIn" rows="1" placeholder="say anything..."
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}"></textarea>
+          <button class="btn-send" id="btnSend" onclick="sendMsg()">↑</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const CLIENT_ID='de8f1b6967c74fde913c9ee6ced000b2';
+const REDIRECT='https://spotify-analyst-nine.vercel.app';
+const SCOPES='user-top-read user-read-private user-read-recently-played playlist-modify-public playlist-modify-private';
+
+const S={token:null,profile:null,topTracks:[],topArtists:[],recentTracks:[],mirror:null,prophecy:null,chatHistory:[],isDemo:false,expiresAt:null};
+const AI_ENDPOINT='/api/claude';
+const AI_TIMEOUT=7000;
+
+function setStatus(msg,type){
+  const el=document.getElementById('status');
+  if(!el) return;
+  el.textContent=msg||'';
+  el.className='status'+(type?` ${type}`:'');
+}
+
+function pick(arr,n=1){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a.slice(0,n);
+}
+
+async function fetchJson(url,opts={},timeout=AI_TIMEOUT){
+  const ctl=new AbortController();
+  const id=setTimeout(()=>ctl.abort(),timeout);
+  try {
+    const r=await fetch(url,{...opts,signal:ctl.signal});
+    clearTimeout(id);
+    return r;
+  } catch(e){
+    clearTimeout(id);
+    throw e;
+  }
+}
+
+const OFFLINE_POOL=[
+  {name:'The Blower\'s Daughter',artist:'Damien Rice'},
+  {name:'Nightswimming',artist:'R.E.M.'},
+  {name:'Holocene',artist:'Bon Iver'},
+  {name:'To Build a Home',artist:'The Cinematic Orchestra'},
+  {name:'High and Dry',artist:'Radiohead'},
+  {name:'Come Away With Me',artist:'Norah Jones'},
+  {name:'The Night We Met',artist:'Lord Huron'},
+  {name:'Re: Stacks',artist:'Bon Iver'},
+  {name:'Hurt',artist:'Johnny Cash'},
+  {name:'Apocalypse',artist:'Cigarettes After Sex'},
+  {name:'Between the Bars',artist:'Elliott Smith'},
+  {name:'Cherry Wine (Live)',artist:'Hozier'},
+  {name:'I Will Follow You into the Dark',artist:'Death Cab for Cutie'},
+  {name:'The Scientist',artist:'Coldplay'},
+  {name:'Breathe Me',artist:'Sia'}
+];
+
+function localMirror(){
+  const name=S.profile?.display_name?.split(' ')[0]||'you';
+  const tracks=S.topTracks.map(t=>t.name).filter(Boolean);
+  const artists=S.topArtists.map(a=>a.name).filter(Boolean);
+  const recent=S.recentTracks.map(i=>i.track?.name).filter(Boolean);
+  const t1=tracks[0]||'that one song';
+  const t2=tracks[1]||tracks[0]||'a quiet anthem';
+  const a1=artists[0]||'your favorite artist';
+  const a2=artists[1]||artists[0]||'another voice you trust';
+  const r1=recent[0]||t1;
+  return {
+    firstRead:`You carry ${t1} and ${t2} like postcards — proof of where your heart returns.`,
+    deepRead:`There’s a thread from ${a1} to ${a2}: you’re drawn to voices that hold longing without rushing it. You choose songs that feel like late-night honesty rather than loud answers. That’s not indecision — it’s a preference for truth.`,
+    alterEgoName:`${pick(['The Quiet Seeker','The Soft Witness','The Night Listener','The Steady Heart'])[0]}`,
+    alterEgoEssence:pick(['still, searching, deeply present','warm, candid, unhurried','gentle, exacting, open','patient, luminous, grounded'])[0],
+    alterEgoDesc:`This version of you notices the subtext in every room. They already trust the feeling you keep circling.`,
+    letter:`I've been listening — and you keep leaving breadcrumbs in ${t1} and ${t2}.\n\nYou move toward songs that make space for what you can’t always say. That’s why ${a1} and ${a2} feel like home.\n\nKeep following that thread. It isn’t random. It’s you.`,
+    letterSign:pick(['the part of you that was listening','the voice between tracks','the you who waits for truth'])[0],
+    blindSpot:`You think your taste is just taste, but it’s really a map of the feeling you’re learning to trust.`,
+    todayNotice:`You came back to ${r1} today. That says something tender is asking for your attention.`,
+    greeting:`Good to see you, ${name}.`
+  };
+}
+
+function localProphecy(){
+  const tracks=S.topTracks.map(t=>t.name).filter(Boolean);
+  const base=OFFLINE_POOL.filter(t=>!tracks.includes(t.name));
+  const picks=pick(base,3);
+  return {
+    intro:'You chase songs that hold light and ache in the same breath.',
+    tracks:picks.map(t=>({name:t.name,artist:t.artist,why:`If ${tracks[0]||'your favorites'} hit, this will too — same quiet pull, different doorway.`})),
+    blindSpot:'You’re not just nostalgic. You’re loyal to a feeling that keeps teaching you.'
+  };
+}
+
+function localChatReply(msg){
+  const name=S.profile?.display_name?.split(' ')[0]||'you';
+  const top=S.topTracks.slice(0,2).map(t=>t.name).filter(Boolean);
+  const anchor=top.length?`I hear ${top.join(' and ')} in the way you ask that.`:`I hear you.`;
+  const tone=msg.toLowerCase().includes('song')
+    ? `If you want a single track, follow the feeling behind ${top[0]||'your favorites'} and go one step quieter.`
+    : `You’re circling something real, ${name}. That’s not a flaw — it’s your compass.`;
+  return `${anchor} ${tone}`;
+}
+
+function localPlaylist(mood){
+  const picks=pick(OFFLINE_POOL,10);
+  return {
+    name:`For "${mood.slice(0,40)}${mood.length>40?'...':''}"`,
+    description:'A soft landing for where you are right now.',
+    tracks:picks.map(t=>({name:t.name,artist:t.artist,reason:pick(['soft, steady, honest','warm, close, human','tender, worn-in ache','quiet, unflinching, true','late, reflective, still'])[0]}))
+  };
+}
+
+// Waveform
+[10,16,6,24,14,20,8,22,12,9,26,16,7,19,11,23,9,17].forEach((h,i)=>{
+  const s=document.createElement('span');
+  s.style.cssText=`--h:${h}px;height:${h}px;animation-delay:${i*.1}s;animation-duration:${1.1+i*.06}s`;
+  document.getElementById('wf').appendChild(s);
+});
+
+// Auth
+function rndStr(n=128){const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,b=>c[b%c.length]).join('');}
+async function pkce(v){const e=new TextEncoder().encode(v);const h=await crypto.subtle.digest('SHA-256',e);return btoa(String.fromCharCode(...new Uint8Array(h))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');}
+
+function authFailed(msg){
+  setStatus(msg||'Login didn’t complete. Try again.', 'warn');
+  setLoginEnabled(true);
+  show('landing');
+}
+
+function onAuthExpired(){
+  setStatus('Session expired. Please reconnect Spotify.', 'warn');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('expiresAt');
+  setLoginEnabled(true);
+  show('landing');
+}
+
+function setLoginEnabled(on){
+  const b=document.getElementById('loginBtn');
+  if(!b) return;
+  b.style.pointerEvents=on?'auto':'none';
+  b.style.opacity=on?'1':'0.6';
+  if(!on) b.setAttribute('aria-busy','true'); else b.removeAttribute('aria-busy');
+}
+
+document.getElementById('loginBtn').onclick=async(e)=>{
+  e.preventDefault();
+  setStatus('Opening Spotify login…');
+  show('loading');
+  setLoginEnabled(false);
+  const v=rndStr();sessionStorage.setItem('cv',v);
+  const ch=await pkce(v);
+  const p=new URLSearchParams({client_id:CLIENT_ID,response_type:'code',redirect_uri:REDIRECT,scope:SCOPES,code_challenge_method:'S256',code_challenge:ch});
+  window.location='https://accounts.spotify.com/authorize?'+p;
+};
+
+async function handleCallback(){
+  const p=new URLSearchParams(window.location.search);
+  const err=p.get('error');
+  if(err){authFailed('Spotify login canceled.');return false;}
+  const code=p.get('code');if(!code)return false;
+  window.history.replaceState({},'',window.location.pathname);
+  const v=sessionStorage.getItem('cv');
+  if(!v){authFailed('Login expired. Please try again.');return false;}
+  try {
+    const r=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:REDIRECT,client_id:CLIENT_ID,code_verifier:v})});
+    const d=await r.json();
+    sessionStorage.removeItem('cv');
+    if(d.access_token){
+      S.token=d.access_token;
+      if(d.expires_in) S.expiresAt=Date.now()+(d.expires_in*1000);
+      sessionStorage.setItem('token',S.token);
+      if(S.expiresAt) sessionStorage.setItem('expiresAt',String(S.expiresAt));
+      return true;
+    }
+  } catch(e){
+    authFailed('Could not complete Spotify login.');
+  }
+  return false;
+}
+
+// Spotify API
+async function sg(ep){
+  if(S.isDemo) return {};
+  if(!S.token) throw new Error('No token');
+  const r=await fetch('https://api.spotify.com/v1'+ep,{headers:{Authorization:'Bearer '+S.token}});
+  if(r.status===401){onAuthExpired();throw new Error('Unauthorized');}
+  return r.json();
+}
+async function sp(ep,body){
+  if(S.isDemo) return {};
+  if(!S.token) throw new Error('No token');
+  const r=await fetch('https://api.spotify.com/v1'+ep,{method:'POST',headers:{Authorization:'Bearer '+S.token,'Content-Type':'application/json'
+      },body:JSON.stringify(body)});
+  if(r.status===401){onAuthExpired();throw new Error('Unauthorized');}
+  return r.json();
+}
+
+async function fetchAll(){
+  try {
+    const[prof,top,art,rec]=await Promise.all([sg('/me'),sg('/me/top/tracks?limit=20&time_range=medium_term'),sg('/me/top/artists?limit=10&time_range=medium_term'),sg('/me/player/recently-played?limit=10')]);
+    if(prof?.error) throw new Error('Spotify error');
+    S.profile=prof;S.topTracks=top.items||[];S.topArtists=art.items||[];S.recentTracks=rec.items||[];
+    return true;
+  } catch(e){
+    if(!S.isDemo){
+      setStatus('Spotify data unavailable. Switching to demo.', 'warn');
+      await runDemo();
+    }
+    return false;
+  }
+}
+
+// Demo
+async function runDemo(){
+  S.isDemo=true;S.token='demo';
+  setStatus('Demo mode — fully interactive.');
+  S.profile={display_name:'Dheer',images:[]};
+  S.topTracks=[
+    {name:'Shree Ram Stuti',artists:[{name:'Sonika Sharma Agarwal'}],album:{images:[{url:''}]}},
+    {name:'Dooriyan',artists:[{name:'Pritam'}],album:{images:[{url:''}]}},
+    {name:'Secret Garden',artists:[{name:'Bruce Springsteen'}],album:{images:[{url:''}]}},
+    {name:'Coming Back to Life',artists:[{name:'Pink Floyd'}],album:{images:[{url:''}]}},
+    {name:"Lover, You Should've Come Over",artists:[{name:'Jeff Buckley'}],album:{images:[{url:''}]}},
+    {name:'Landslide',artists:[{name:'Fleetwood Mac'}],album:{images:[{url:''}]}},
+    {name:'When a Man Loves a Woman',artists:[{name:'Michael Bolton'}],album:{images:[{url:''}]}},
+    {name:'Fake Plastic Trees',artists:[{name:'Radiohead'}],album:{images:[{url:''}]}},
+  ];
+  S.topArtists=[{name:'Bruce Springsteen',genres:['heartland rock']},{name:'Pink Floyd',genres:['progressive rock']},{name:'Jeff Buckley',genres:['alternative']},{name:'Radiohead',genres:['art rock']},{name:'Fleetwood Mac',genres:['soft rock']}];
+  S.recentTracks=[
+    {track:{name:'Dooriyan',artists:[{name:'Pritam'}],album:{images:[{url:''}]}},played_at:new Date(Date.now()-3600000).toISOString()},
+    {track:{name:'Coming Back to Life',artists:[{name:'Pink Floyd'}],album:{images:[{url:''}]}},played_at:new Date(Date.now()-7200000).toISOString()},
+    {track:{name:'Secret Garden',artists:[{name:'Bruce Springsteen'}],album:{images:[{url:''}]}},played_at:new Date(Date.now()-10800000).toISOString()},
+  ];
+  await boot();
+}
+
+// Loading
+const loadMsgs=['listening to your music...','reading between the songs...','finding the through-line...','writing you a letter...','almost there...'];
+
+async function boot(){
+  show('loading');
+  setStatus('');
+  const msg=document.getElementById('loadMsg');
+  let i=0;const iv=setInterval(()=>{if(i<loadMsgs.length)msg.textContent=loadMsgs[i++];},900);
+  await Promise.all([buildMirror(),buildProphecy()]);
+  clearInterval(iv);
+  renderApp();
+  show('app');
+}
+
+// AI Mirror
+async function buildMirror(){
+  const tracks=S.topTracks.map(t=>`"${t.name}" by ${t.artists[0].name}`).join(', ');
+  const artists=S.topArtists.map(a=>`${a.name} (${(a.genres||[]).slice(0,2).join(', ')})`).join(', ');
+  const recent=S.recentTracks.slice(0,5).map(i=>`"${i.track.name}" by ${i.track.artists[0].name}`).join(', ');
+  const name=S.profile?.display_name?.split(' ')[0]||'you';
+
+  const prompt=`You are Jarvis — not an AI assistant, but the alter ego that lives inside ${name}'s music. The version of them that only exists in the space between songs. You see them clearly, without judgment, with warmth and depth.
+
+Their top tracks: ${tracks}
+Their top artists: ${artists}
+Recently played: ${recent}
+
+Study these carefully. Find the through-line — the feeling that connects all of it. Look at what they're searching for across languages, decades, genres.
+
+Return ONLY a JSON object (no markdown, no explanation):
+{
+  "firstRead": "One sentence. The most true thing about this person based on their music. Warm, specific, poetic. Like the opening line of a letter from someone who really sees them. MUST reference their actual songs or artists by name. No generic statements whatsoever.",
+  "deepRead": "Three sentences. A psychological portrait. What feeling are they chasing across all these songs? What does this specific combination — these specific artists — reveal about how they experience the world? Be specific. Reference actual artists and explain the connection between them. Warm, not clinical.",
+  "alterEgoName": "A name for their alter ego — specific to their actual taste. Something evocative. 2-3 words.",
+  "alterEgoEssence": "5-6 words describing this alter ego's energy",
+  "alterEgoDesc": "Two sentences. How does this alter ego move through the world? What do they know that ${name} is still figuring out?",
+  "letter": "A letter from the alter ego to ${name}. 3 short paragraphs separated by newlines. Warm, intimate, specific — must reference actual song titles from their list. The kind of letter that makes someone feel deeply seen. Start with something like 'You already know' or 'I've been listening' or 'The thing about'. No generic inspirational language.",
+  "letterSign": "How the alter ego signs — one evocative phrase, not 'Jarvis'",
+  "blindSpot": "One thing their music reveals that they probably can't see about themselves. Gentle, warm. Specific to their actual songs.",
+  "todayNotice": "Based on the recently played: ${recent} — one warm observation about today. Like Jarvis noticed something. Specific to those actual songs. Example format: 'You came back to [specific song] today. [gentle observation].'",
+  "greeting": "A warm personal greeting for the Today page. Include name ${name}. Under 12 words. Feels like someone who knows you."
+}`;
+
+  const local=localMirror();
+  if(S.isDemo || !AI_ENDPOINT){S.mirror=local;}
+  else {
+    try {
+      const r=await fetchJson(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'
+        },body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})});
+      if(!r.ok) throw new Error('AI error');
+      const d=await r.json();
+      S.mirror=JSON.parse(d.content[0].text.replace(/```json|```/g,'').trim());
+    } catch(e){
+      S.mirror=local;
+    }
+  }
+
+  S.chatHistory=[
+    {role:'user',content:`You are Jarvis — the musical alter ego of ${name}. Not an AI. The version of them their music has been quietly building. You know them through their music: ${tracks}. You've seen them clearly: "${S.mirror.firstRead}". Speak with warmth, depth, specificity. Like Robin Williams in Good Will Hunting — present, honest, gentle but real. Never generic. Always reference their actual music. 2-4 sentences. You already know them. You are them.`},
+    {role:'assistant',content:`I'm here.`}
+  ];
+}
+
+// AI Prophecy
+async function buildProphecy(){
+  const tracks=S.topTracks.map(t=>`"${t.name}" by ${t.artists[0].name}`).join(', ');
+  const prompt=`Based on this listener's taste: ${tracks}
+
+Find 3 songs they've probably never heard that will feel like a revelation. Not recommendations — prophecies. Songs that match the feeling they're chasing, not the genre. Real songs on Spotify.
+
+Return ONLY JSON:
+{"intro":"One sentence — the feeling that runs through all their music, the thing they're really searching for.",
+"tracks":[
+{"name":"song name","artist":"artist name","why":"One specific sentence — why this will hit them, referencing their actual taste and songs by name."},
+{"name":"song name","artist":"artist name","why":"One specific sentence."},
+{"name":"song name","artist":"artist name","why":"One specific sentence."}
+],
+"blindSpot":"One gentle observation about what their taste reveals. Warm, specific. Not brutal."}`;
+
+  const local=localProphecy();
+  if(S.isDemo || !AI_ENDPOINT){S.prophecy=local;}
+  else {
+    try {
+      const r=await fetchJson(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'
+        },body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]})});
+      if(!r.ok) throw new Error('AI error');
+      const d=await r.json();
+      S.prophecy=JSON.parse(d.content[0].text.replace(/```json|```/g,'').trim());
+    } catch(e){
+      S.prophecy=local;
+    }
+  }
+}
+
+// Render
+function renderApp(){
+  const name=S.profile?.display_name?.split(' ')[0]||'';
+  document.getElementById('uName').textContent=name;
+  const img=document.getElementById('uImg');
+  if(S.profile?.images?.[0]?.url){img.src=S.profile.images[0].url;img.style.display='block';}
+  renderToday();renderMirror();renderDiscover();
+  const cm=document.getElementById('chatMsgs');cm.innerHTML='';
+  addMsg('jarvis',S.mirror?.firstRead||"I've been listening.");
+}
+
+function renderToday(){
+  const m=S.mirror;
+  document.getElementById('todayGreeting').innerHTML=m?.greeting||'Good to see you.';
+  const tn=document.getElementById('todayNotices');
+  if(m?.todayNotice) tn.innerHTML=`<div class="today-notice">${m.todayNotice}</div>`;
+  else tn.innerHTML='';
+  const list=document.getElementById('recentList');
+  if(!S.recentTracks.length){list.innerHTML=`<p style="font-size:12px;color:var(--sub);font-style:italic;font-family:'Cormorant Garamond',serif;padding:20px 0">Start listening and come back — Jarvis will notice.</p>`;return;}
+  list.innerHTML=S.recentTracks.slice(0,8).map(item=>{
+    const t=item.track;
+    const time=item.played_at?timeAgo(new Date(item.played_at)):'';
+    return `<div class="rt-track">${t.album?.images?.[0]?.url?`<img class="rt-img" src="${t.album.images[0].url}" alt="">` :`<div class="rt-img"></div>`}<div class="rt-info"><div class="rt-name">${t.name}</div><div class="rt-artist">${t.artists[0].name}</div></div><span class="rt-time">${time}</span></div>`;
+  }).join('');
+}
+
+function renderMirror(){
+  const m=S.mirror;if(!m)return;
+  document.getElementById('frText').textContent=m.firstRead;
+  document.getElementById('deepRead').textContent=m.deepRead;
+  document.getElementById('aeName').textContent=m.alterEgoName||'—';
+  document.getElementById('aeSub').textContent=m.alterEgoEssence||'—';
+  document.getElementById('aeDesc').textContent=m.alterEgoDesc||'—';
+  const body=m.letter||'';
+  document.getElementById('letterBody').innerHTML=body.split('\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('');
+  document.getElementById('letterSign').textContent='— '+(m.letterSign||'Jarvis');
+}
+
+function renderDiscover(){
+  const p=S.prophecy;if(!p)return;
+  document.getElementById('prophecyIntro').textContent=p.intro||'';
+  document.getElementById('prophecyTracks').innerHTML=(p.tracks||[]).map((t,i)=>`
+    <div class="prophecy-track" style="animation-delay:${i*.1}s">
+      <div class="pt-num">0${i+1} of 3</div>
+      <div class="pt-name">${t.name}</div>
+      <div class="pt-artist">${t.artist}</div>
+      <div class="pt-why">${t.why}</div>
+    </div>`).join('');
+  if(p.blindSpot){document.getElementById('bsText').textContent=p.blindSpot;document.getElementById('blindSpot').style.display='block';}
+}
+
+function copyLetter(){
+  const m=S.mirror;if(!m)return;
+  const text=m.letter+'\n\n— '+m.letterSign;
+  const b=document.querySelector('.share-letter');
+  navigator.clipboard.writeText(text).then(()=>{
+    b.textContent='copied ✓';setTimeout(()=>b.textContent='Copy letter',2000);
+  }).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=text;document.body.appendChild(ta);
+    ta.select();document.execCommand('copy');
+    document.body.removeChild(ta);
+    b.textContent='copied ✓';setTimeout(()=>b.textContent='Copy letter',2000);
+  });
+}
+
+// Playlist
+function setMood(el){document.getElementById('moodIn').value=el.textContent;}
+
+async function genPlaylist(){
+  const mood=document.getElementById('moodIn').value.trim();if(!mood)return;
+  const btn=document.getElementById('btnGen');btn.disabled=true;btn.textContent='building...';
+  const tracks=S.topTracks.slice(0,8).map(t=>`"${t.name}" by ${t.artists[0].name}`).join(', ');
+  const prompt=`You are Jarvis. You know this person's taste: ${tracks}. Their soul: "${S.mirror?.firstRead||''}"
+They said: "${mood}"
+Build them a 10-song playlist for exactly this moment. Not genre — feeling. Songs that meet them where they are.
+Return ONLY JSON: {"name":"playlist name","description":"one sentence","tracks":[{"name":"song","artist":"artist","reason":"3 words"},{"name":"song","artist":"artist","reason":"3 words"},{"name":"song","artist":"artist","reason":"3 words"},{"name":"song","artist":"artist","reason":"3 words"},{"name":"song","artist":"artist","reason":"3 words"},{"name":"song","artist":"artist","reason":"3 words"},{"name":"song","artist":"artist","reason":"3 words"},{"name":"song","artist":"artist","reason":"3 words"},{"name":"song","artist":"artist","reason":"3 words"},{"name":"song","artist":"artist","reason":"3 words"}]}`;
+  try {
+    if(S.isDemo || !AI_ENDPOINT) throw new Error('local');
+    const r=await fetchJson(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'
+      },body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    if(!r.ok) throw new Error('AI error');
+    const d=await r.json();
+    renderPlaylist(JSON.parse(d.content[0].text.replace(/```json|```/g,'').trim()));
+  } catch(e){
+    renderPlaylist(localPlaylist(mood));
+  }
+  btn.disabled=false;btn.textContent='Build it →';
+}
+
+function renderPlaylist(pl){
+  const id='s'+Date.now();
+  document.getElementById('plOut').innerHTML=`
+    <div class="pl-name">${pl.name}</div>
+    <div class="pl-desc-text">${pl.description}</div>
+    ${(pl.tracks||[]).map((t,i)=>`<div class="pl-track"><span class="pl-n">0${i+1}</span><div class="pl-info"><div class="pl-tname">${t.name}</div><div class="pl-tartist">${t.artist}</div></div><span class="pl-twhy">${t.reason}</span></div>`).join('')}
+    <button class="btn-save-pl" id="${id}" onclick="saveToSpotify(${JSON.stringify(pl).replace(/"/g,'&quot;')}, '${id}')">Save to Spotify</button>`;
+}
+
+async function saveToSpotify(pl,btnId){
+  if(S.isDemo){const b=document.getElementById(btnId);b.textContent='✓ Saved (Demo)';b.classList.add('saved');return;}
+  const b=document.getElementById(btnId);b.textContent='saving...';b.disabled=true;
+  try {
+    const c=await sp(`/users/${S.profile.id}/playlists`,{name:pl.name,description:pl.description+' — via Jarvis',public:false});
+    const uris=[];
+    for(const t of(pl.tracks||[]).slice(0,10)){const s=await sg(`/search?q=${encodeURIComponent(t.name+' '+t.artist)}&type=track&limit=1`);if(s.tracks?.items?.[0])uris.push(s.tracks.items[0].uri);}
+    if(uris.length)await sp(`/playlists/${c.id}/tracks`,{uris});
+    b.textContent='✓ Saved to Spotify';b.classList.add('saved');
+  } catch(e){b.textContent='error — try again';b.disabled=false;}
+}
+
+// Chat
+function qs(el){document.getElementById('chatIn').value=el.textContent;document.getElementById('starters').style.display='none';sendMsg();}
+
+async function sendMsg(){
+  const inp=document.getElementById('chatIn');
+  const msg=inp.value.trim();if(!msg)return;
+  const st=document.getElementById('starters');if(st)st.style.display='none';
+  inp.value='';addMsg('user',msg);
+  const btn=document.getElementById('btnSend');btn.disabled=true;
+  const tid='t'+Date.now();
+  addMsg('jarvis','<div class="thinking"><span></span><span></span><span></span></div>',tid);
+  S.chatHistory.push({role:'user',content:msg});
+  try {
+    if(S.isDemo || !AI_ENDPOINT) throw new Error('local');
+    const r=await fetchJson(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'
+      },body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',max_tokens:600,
+      system:`You are Jarvis — the musical alter ego, the version of this person their music has been quietly building. You already know them through: ${S.topTracks.slice(0,6).map(t=>t.name+' by '+t.artists[0].name).join(', ')}. What you see: "${S.mirror?.firstRead||''}". Speak like Robin Williams in Good Will Hunting — present, warm, specific, honest. Not an assistant. A mirror that already knows. Reference their actual songs when relevant. 2-4 sentences. Never generic. Never a list. Always a real conversation.`,
+      messages:S.chatHistory
+    })});
+    if(!r.ok) throw new Error('AI error');
+    const d=await r.json();const reply=d.content[0].text;
+    S.chatHistory.push({role:'assistant',content:reply});
+    document.getElementById(tid)?.remove();
+    addMsg('jarvis',reply.replace(/\n/g,'<br>'));
+  } catch(e){
+    document.getElementById(tid)?.remove();
+    const reply=localChatReply(msg);
+    S.chatHistory.push({role:'assistant',content:reply});
+    addMsg('jarvis',reply);
+  }
+  btn.disabled=false;inp.focus();
+}
+
+function addMsg(role,html,id){
+  const m=document.createElement('div');m.className='msg '+role;if(id)m.id=id;
+  m.innerHTML=`<div class="av">${role==='jarvis'?'J':'—'}</div><div class="bbl">${html}</div>`;
+  const c=document.getElementById('chatMsgs');c.appendChild(m);c.scrollTop=c.scrollHeight;
+}
+
+function show(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function sw(name,btn){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));document.getElementById('panel'+name).classList.add('on');btn.classList.add('on');}
+function timeAgo(date){const mins=Math.floor((Date.now()-date)/60000);if(mins<1)return 'just now';if(mins<60)return mins+'m ago';const h=Math.floor(mins/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';}
+
+(async()=>{
+  if(window.location.search.includes('error=')){
+    authFailed('Spotify login canceled.');
+    return;
+  }
+  if(window.location.search.includes('code=')){
+    const ok=await handleCallback();
+    if(ok){
+      const loaded=await fetchAll();
+      if(loaded){await boot();}
+      return;
+    }
+  }
+  const cached=sessionStorage.getItem('token');
+  const exp=Number(sessionStorage.getItem('expiresAt')||'0');
+  if(cached && (!exp || Date.now()<exp)){
+    S.token=cached;S.expiresAt=exp||null;
+    const loaded=await fetchAll();
+    if(loaded){await boot();return;}
+  }
+  show('landing');
+  setLoginEnabled(true);
+})();
+</script>
+</body>
+</html>
