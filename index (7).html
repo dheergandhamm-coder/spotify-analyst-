@@ -789,15 +789,66 @@ function renderPlaylist(pl){
 }
 
 async function saveToSpotify(pl,btnId){
-  if(S.isDemo){const b=document.getElementById(btnId);b.textContent='✓ Saved (Demo)';b.classList.add('saved');return;}
-  const b=document.getElementById(btnId);b.textContent='saving...';b.disabled=true;
+  if(S.isDemo){
+    const b=document.getElementById(btnId);
+    console.log('[Spotify] Demo mode enabled, skipping playlist save.', { playlist: pl });
+    b.textContent='✓ Saved (Demo)';
+    b.classList.add('saved');
+    return;
+  }
+  const b=document.getElementById(btnId);
+  b.textContent='saving...';
+  b.disabled=true;
   try {
-    const c=await sp(`/users/${S.profile.id}/playlists`,{name:pl.name,description:pl.description+' — via Jarvis',public:false});
+    console.log('[Spotify] Starting playlist save.', {
+      userId: S.profile?.id,
+      name: pl.name,
+      trackCount: (pl.tracks || []).length
+    });
+    console.log('[Spotify] Creating playlist...');
+    const c=await sp(`/users/${S.profile.id}/playlists`,{
+      name:pl.name,
+      description:pl.description+' — via Jarvis',
+      public:true
+    });
+    console.log('[Spotify] Playlist created.', c);
+    const playlistUrl = c?.external_urls?.spotify || `https://open.spotify.com/playlist/${c.id}`;
     const uris=[];
-    for(const t of(pl.tracks||[]).slice(0,10)){const s=await sg(`/search?q=${encodeURIComponent(t.name+' '+t.artist)}&type=track&limit=1`);if(s.tracks?.items?.[0])uris.push(s.tracks.items[0].uri);}
-    if(uris.length)await sp(`/playlists/${c.id}/tracks`,{uris});
-    b.textContent='✓ Saved to Spotify';b.classList.add('saved');
-  } catch(e){b.textContent='error — try again';b.disabled=false;}
+    for(const t of(pl.tracks||[]).slice(0,10)){
+      console.log('[Spotify] Searching track...', { name: t.name, artist: t.artist });
+      const s=await sg(`/search?q=${encodeURIComponent(t.name+' '+t.artist)}&type=track&limit=1`);
+      const match = s.tracks?.items?.[0];
+      if(match){
+        uris.push(match.uri);
+        console.log('[Spotify] Track matched.', {
+          query: `${t.name} ${t.artist}`,
+          uri: match.uri,
+          foundName: match.name,
+          foundArtist: match.artists?.map(a => a.name).join(', ')
+        });
+      } else {
+        console.warn('[Spotify] No Spotify match found for track.', {
+          query: `${t.name} ${t.artist}`
+        });
+      }
+    }
+    console.log('[Spotify] Track search complete.', { matched: uris.length, uris });
+    if(uris.length){
+      console.log('[Spotify] Adding tracks to playlist...', { playlistId: c.id, uris });
+      await sp(`/playlists/${c.id}/tracks`,{uris});
+      console.log('[Spotify] Tracks added successfully.', { playlistId: c.id, added: uris.length });
+    } else {
+      console.warn('[Spotify] No tracks matched, playlist created without tracks.', { playlistId: c.id });
+    }
+    b.textContent='✓ Saved to Spotify';
+    b.classList.add('saved');
+    console.log('[Spotify] Opening playlist URL...', { playlistUrl });
+    window.open(playlistUrl, '_blank', 'noopener');
+  } catch(e){
+    console.error('[Spotify] Save failed.', e);
+    b.textContent='error — try again';
+    b.disabled=false;
+  }
 }
 
 // Chat
