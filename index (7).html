@@ -803,6 +803,13 @@ async function saveToSpotify(pl,btnId){
     return;
   }
   const playlistName = chosenName.trim() || pl.name || 'Jarvis Playlist';
+  console.log('[Spotify] Attempting to open a Spotify tab from the user click gesture.');
+  const spotifyTab = window.open('https://open.spotify.com/', '_blank', 'noopener');
+  if(spotifyTab){
+    console.log('[Spotify] Spotify tab opened successfully and will be redirected after playlist creation.');
+  } else {
+    console.warn('[Spotify] Spotify tab was blocked by the browser. Will fall back to redirecting the current page.');
+  }
   b.textContent='saving...';
   b.disabled=true;
   try {
@@ -819,8 +826,13 @@ async function saveToSpotify(pl,btnId){
     });
     console.log('[Spotify] Playlist created.', c);
     const playlistUrl = c?.external_urls?.spotify || `https://open.spotify.com/playlist/${c.id}`;
-    console.log('[Spotify] Opening playlist right away so you can watch it build.', { playlistUrl });
-    window.open(playlistUrl, '_blank', 'noopener');
+    console.log('[Spotify] Redirecting to playlist.', { playlistUrl });
+    if(spotifyTab){
+      spotifyTab.location.href = playlistUrl;
+      spotifyTab.focus?.();
+    } else {
+      window.location.href = playlistUrl;
+    }
     const uris=[];
     for(const t of(pl.tracks||[]).slice(0,10)){
       console.log('[Spotify] Searching track...', { name: t.name, artist: t.artist });
